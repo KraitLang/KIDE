@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>KIDE Projects</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Fira Code', monospace;
+      background-color: #0f111a;
+      color: #f8f8f2;
+    }
+
+    header {
+      text-align: center;
+      padding: 2rem 1rem;
+      background-color: #1a1c28;
+      border-bottom: 2px solid #444;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 2.5rem;
+    }
+
+    .project-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 2rem;
+      gap: 1rem;
+    }
+
+    .card {
+      background-color: #1a1c28;
+      border: 1px solid #333;
+      border-radius: 8px;
+      width: 250px;
+      padding: 1rem;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .card:hover {
+      transform: scale(1.03);
+      background-color: #222430;
+    }
+
+    .card h2 {
+      margin-top: 0;
+      font-size: 1.4rem;
+    }
+
+    .card small {
+      color: #aaa;
+    }
+
+    .toolbar {
+      text-align: center;
+      margin-top: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .toolbar-top {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    button, label[for="uploadZip"] {
+      background-color: #50fa7b;
+      color: #000;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    input[type="search"] {
+      padding: 0.5rem 1rem;
+      border-radius: 5px;
+      border: 1px solid #444;
+      background-color: #1a1c28;
+      color: #fff;
+      font-family: 'Fira Code', monospace;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>KIDE Project Manager</h1>
+    <p>Select or create a Krait project to begin</p>
+  </header>
+
+  <div class="toolbar">
+    <div class="toolbar-top">
+      <button onclick="newProject()">➕ New Project</button>
+      <label for="uploadZip"><button>📥 Import ZIP</button></label>
+      <input type="file" id="uploadZip" accept=".zip" onchange="handleZipUpload(event)">
+    </div>
+    <input type="search" id="searchBox" placeholder="🔍 Search projects..." oninput="filterProjects()">
+  </div>
+
+  <div class="project-container" id="projectList">
+    <!-- Cards will be inserted here -->
+  </div>
+
+  <script>
+    const projectListEl = document.getElementById('projectList');
+    let allProjects = [];
+
+    function loadProjects() {
+      const request = indexedDB.open('kide_projects', 1);
+      request.onupgradeneeded = e => {
+        const db = e.target.result;
+        db.createObjectStore('meta', { keyPath: 'name' });
+      };
+      request.onsuccess = e => {
+        const db = e.target.result;
+        const tx = db.transaction('meta', 'readonly');
+        const store = tx.objectStore('meta');
+        const req = store.getAll();
+        req.onsuccess = () => {
+          allProjects = req.result;
+          renderProjectCards(allProjects);
+        };
+      };
+    }
+
+    function renderProjectCards(projects) {
+      projectListEl.innerHTML = '';
+      projects.forEach(project => addCard(project.name, project.date));
+    }
+
+    function filterProjects() {
+      const keyword = document.getElementById('searchBox').value.toLowerCase();
+      const filtered = allProjects.filter(p => p.name.toLowerCase().includes(keyword));
+      renderProjectCards(filtered);
+    }
+
+    function addCard(name, date) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `<h2>${name}</h2><small>Last used: ${new Date(date).toLocaleString()}</small>`;
+      card.onclick = () => {
+        localStorage.setItem('kide_active_project', name);
+        location.href = 'kide_workspace.html';
+      };
+      projectListEl.appendChild(card);
+    }
+
+    function newProject() {
+      const name = prompt("Enter new project name:");
+      if (!name) return;
+      const request = indexedDB.open('kide_projects', 1);
+      request.onsuccess = e => {
+        const db = e.target.result;
+        const tx = db.transaction('meta', 'readwrite');
+        const store = tx.objectStore('meta');
+        store.put({ name, date: Date.now() });
+        localStorage.setItem('kide_active_project', name);
+        location.href = 'kide_workspace.html';
+      };
+    }
+
+    function handleZipUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const name = prompt("Enter project name for this ZIP:");
+      if (!name) return;
+      localStorage.setItem('kide_active_project', name);
+      location.href = 'kide_workspace.html';
+    }
+
+    loadProjects();
+  </script>
+</body>
+</html>
